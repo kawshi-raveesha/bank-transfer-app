@@ -28,4 +28,12 @@ public interface BankTransactionRepository
     @Query("SELECT COUNT(t) FROM BankTransaction t WHERE t.status = :status")
     long countByStatus(@Param("status") TransactionStatus status);
 
+    //5. Finds transfers above a specific amount
+    @Query("SELECT t FROM BankTransaction t WHERE t.amount >= :min ORDER BY t.createdAt DESC")
+    List<BankTransaction> findLargeTransfers(@Param("min") BigDecimal min);
+
+        //6. Sum of SUCCESS transfers where the account is the sender
+    @Query("SELECT SUM(t.amount) FROM BankTransaction t WHERE t.fromAccount = :account AND t.status = 'SUCCESS'")
+    BigDecimal getTotalSentByAccount(@Param("account") String account);
+
 }
