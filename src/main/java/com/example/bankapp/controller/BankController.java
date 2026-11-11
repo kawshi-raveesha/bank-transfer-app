@@ -28,16 +28,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BankController {
 
-    private final BankService bankService;
-    private final TransactionAuditService transactionAuditService;
+private final BankService bankService;
+private final TransactionAuditService transactionAuditService;
 
     
+   
     // 1. GET / (Dashboard)
-    
-        // ==========================================
-    // 1. GET / (Dashboard)
-    // ==========================================
-       @GetMapping("/")
+
+    @GetMapping("/")
     public String dashboard(@RequestParam(required = false) String keyword, Model model) {
         List<Customer> customers;
         if (keyword != null && !keyword.trim().isEmpty()) {
@@ -78,8 +76,8 @@ public class BankController {
                            RedirectAttributes redirectAttributes) {
         
         // If form validation fails (e.g., amount is empty or negative), go back to dashboard
-                // If form validation fails (e.g., amount is empty, or missing in Postman)
-                if (bindingResult.hasErrors()) {
+        // If form validation fails (e.g., amount is empty, or missing in Postman)
+            if (bindingResult.hasErrors()) {
             // WE NEED TO SEE THE ERROR IN THE TERMINAL
             System.out.println("VALIDATION FAILED: " + bindingResult.getAllErrors());
             
@@ -111,7 +109,6 @@ public class BankController {
 
    
     // 3. POST /customers (Add Customer)
-    // ==========================================
     @PostMapping("/customers")
     public String addCustomer(@ModelAttribute Customer customer, RedirectAttributes redirectAttributes) {
         try {
@@ -123,27 +120,78 @@ public class BankController {
         return "redirect:/";
     }
 
-    // ==========================================
+  
     // 4. GET /accounts/{accountNumber}/history
-    // ==========================================
-    @GetMapping("/accounts/{accountNumber}/history")
+       @GetMapping("/accounts/{accountNumber}/history")
     public String history(@PathVariable String accountNumber, Model model) {
+        // 1. Find the customer
         Customer customer = bankService.getByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException("Account not found"));
         
+        // 2. Get THIS customer's specific transactions
         List<BankTransaction> transactions = bankService.findHistory(accountNumber);
         
+        // 3. Get the total amount sent
+        BigDecimal totalSent = bankService.getTotalSentByAccount(accountNumber);
+        
+        // 4. Add to model
         model.addAttribute("customer", customer);
         model.addAttribute("transactions", transactions);
-
-                // For the stats
-        model.addAttribute("latestTransactions", bankService.findAllLatest());
+        model.addAttribute("totalSent", totalSent); // <-- Fixes the blank LKR
         
-        // Add these aliases just in case the instructor's HTML uses a different name:
-        model.addAttribute("transactions", bankService.findAllLatest());
-        model.addAttribute("allTransactions", bankService.findAllLatest());
-        model.addAttribute("recentTransactions", bankService.findAllLatest());
-        
-        return "history"; // This refers to history.html
+        return "history"; 
     }
-}
+
+    //large transfers page
+
+    @GetMapping("/large-transfers")
+    public String largeTransfers(@RequestParam(defaultValue = "10000") BigDecimal min, Model model) {
+        
+        // 1. Get the data from the database using our new query
+        List<BankTransaction> largeTransactions = bankService.findLargeTransfers(min);
+        
+        // 2. Pass the data using the EXACT names the HTML is asking for
+        model.addAttribute("transfers", largeTransactions); // HTML uses ${transfers}
+        model.addAttribute("min", min);                     // HTML uses ${min}
+        
+        // 3. Return the name of the new HTML file we will create
+        return "large-transfers"; 
+    }
+    
+//deposit and withdraw pages
+
+    @GetMapping("/deposit")
+    public String showDepositForm(Model model) {
+        model.addAttribute("customers", bankService.findAllOrdered());
+        return "deposit"; 
+    }
+
+    @PostMapping("/deposit")
+    public String deposit(@RequestParam String accountNumber, @RequestParam BigDecimal amount, RedirectAttributes redirectAttributes) {
+        try {
+            bankService.deposit(accountNumber, amount);
+            redirectAttributes.addFlashAttribute("success", "Successfully deposited LKR " + amount + " to account " + accountNumber);
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/deposit"; 
+    }
+
+    @GetMapping("/withdraw")
+    public String showWithdrawForm(Model model) {
+        model.addAttribute("customers", bankService.findAllOrdered());
+        return "withdraw"; 
+    }
+
+    @PostMapping("/withdraw")
+    public String withdraw(@RequestParam String accountNumber, @RequestParam BigDecimal amount, RedirectAttributes redirectAttributes) {
+        try {
+            bankService.withdraw(accountNumber, amount);
+            redirectAttributes.addFlashAttribute("success", "Successfully withdrew LKR " + amount + " from account " + accountNumber);
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/withdraw"; 
+    }
+    
+    }
